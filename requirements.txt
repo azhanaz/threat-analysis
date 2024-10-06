@@ -1,0 +1,9 @@
+Flask
+opencv-python
+tensorflow
+tensorflow-hub
+pillow
+textblob
+pyaudio
+SpeechRecognition
+numpy
