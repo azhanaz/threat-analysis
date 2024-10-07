@@ -43,36 +43,41 @@ emotion_keywords = {
 def generate_frames():
     with picamera.PiCamera() as camera:
         camera.resolution = (640, 480)
-        camera.framerate = 24
+        camera.framerate = 30  # Increased frame rate
         with picamera.array.PiRGBArray(camera) as stream:
+            frame_count = 0  # Initialize frame counter
             for frame in camera.capture_continuous(stream, format='bgr', use_video_port=True):
                 image = frame.array
                 (h, w) = image.shape[:2]
-                blob = cv2.dnn.blobFromImage(image, 0.007843, (300, 300), 127.5)
-                net.setInput(blob)
-
-                with lock:
-                    detected_objects.clear()
-
-                detections = net.forward()
                 
-                for i in range(detections.shape[2]):
-                    confidence = detections[0, 0, i, 2]
-                    if confidence > 0.5:
-                        idx = int(detections[0, 0, i, 1])
-                        box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-                        (startX, startY, endX, endY) = box.astype("int")
+                # Skip processing every 2nd frame to reduce load
+                if frame_count % 2 == 0:
+                    blob = cv2.dnn.blobFromImage(image, 0.007843, (224, 224), 127.5)  # Reduced size for blob
+                    net.setInput(blob)
 
-                        with lock:
-                            detected_objects.append({
-                                "class": labels[idx],
-                                "confidence": float(confidence)
-                            })
+                    with lock:
+                        detected_objects.clear()
 
-                        label = f"{labels[idx]}: {confidence:.2f}"
-                        cv2.rectangle(image, (startX, startY), (endX, endY), (0, 255, 0), 2)
-                        cv2.putText(image, label, (startX, startY - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                    detections = net.forward()
+                    
+                    for i in range(detections.shape[2]):
+                        confidence = detections[0, 0, i, 2]
+                        if confidence > 0.4:  # Adjusted confidence threshold
+                            idx = int(detections[0, 0, i, 1])
+                            box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+                            (startX, startY, endX, endY) = box.astype("int")
 
+                            with lock:
+                                detected_objects.append({
+                                    "class": labels[idx],
+                                    "confidence": float(confidence)
+                                })
+
+                            label = f"{labels[idx]}: {confidence:.2f}"
+                            cv2.rectangle(image, (startX, startY), (endX, endY), (0, 255, 0), 2)
+                            cv2.putText(image, label, (startX, startY - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                frame_count += 1  # Increment frame counter
                 ret, buffer = cv2.imencode('.jpg', image)
                 frame = buffer.tobytes()
 
