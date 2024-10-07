@@ -5,7 +5,8 @@ import threading
 import speech_recognition as sr
 import time
 from textblob import TextBlob
-import subprocess
+import picamera
+import picamera.array
 
 app = Flask(__name__)
 
@@ -22,63 +23,63 @@ lock = threading.Lock()  # Lock for thread-safe operations
 lock_transcription = threading.Lock()  # Lock for transcription
 
 threat_keywords = [
-    # Your existing threat keywords
+    'help', 'danger', 'risk', 'emergency', 'threat', 'attack', 'violence', 'weapon', 'gun', 'knife', 
+    'hostage', 'assault', 'terror', 'panic', 'crisis', 'harm', 'murder', 'shooting', 'explosion', 'bomb', 
+    'fight', 'kill', 'homicide', 'break-in', 'robbery', 'intruder', 'kidnapping', 'assassination', 
+    'terrorist', 'deadly', 'death', 'hazard', 'fear', 'escape', 'fire', 'flee', 'abuse', 'trap', 'safety', 
+    'survival'
 ]
 
 emotion_keywords = {
-    # Your existing emotion keywords
+    'Fear': ['scared', 'afraid', 'fear', 'terrified'],
+    'Anger': ['angry', 'furious', 'mad', 'irritated'],
+    'Sadness': ['sad', 'unhappy', 'sorrow', 'depressed'],
+    'Joy': ['happy', 'joy', 'excited', 'pleased'],
+    'Surprise': ['surprised', 'shocked', 'astonished'],
+    'Disgust': ['disgusted', 'sick', 'gross', 'repulsed']
 }
 
-# Function to generate video frames
+# Function to generate video frames using the Raspberry Pi camera
 def generate_frames():
-    # Start the raspistill process and pipe the output
-    process = subprocess.Popen(
-        ['raspistill', '-t', '0', '-w', '640', '-h', '480', '-o', '-'],  # Output to stdout
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        bufsize=10**8
-    )
-
-    while True:
-        # Read a frame from the output
-        frame = process.stdout.read(640 * 480 * 3)  # Read a frame (width * height * channels)
-        if not frame:
-            break
-
-        # Convert to a format suitable for OpenCV
-        frame = np.frombuffer(frame, dtype=np.uint8).reshape((480, 640, 3))
-
-        (h, w) = frame.shape[:2]
-        blob = cv2.dnn.blobFromImage(frame, 0.007843, (300, 300), 127.5)
-        net.setInput(blob)
-
-        with lock:
-            detected_objects.clear()
-
-        detections = net.forward()
-        
-        for i in range(detections.shape[2]):
-            confidence = detections[0, 0, i, 2]
-            if confidence > 0.5:
-                idx = int(detections[0, 0, i, 1])
-                box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-                (startX, startY, endX, endY) = box.astype("int")
+    with picamera.PiCamera() as camera:
+        camera.resolution = (640, 480)
+        camera.framerate = 24
+        with picamera.array.PiRGBArray(camera) as stream:
+            for frame in camera.capture_continuous(stream, format='bgr', use_video_port=True):
+                image = frame.array
+                (h, w) = image.shape[:2]
+                blob = cv2.dnn.blobFromImage(image, 0.007843, (300, 300), 127.5)
+                net.setInput(blob)
 
                 with lock:
-                    detected_objects.append({
-                        "class": labels[idx],
-                        "confidence": float(confidence)
-                    })
+                    detected_objects.clear()
 
-                label = f"{labels[idx]}: {confidence:.2f}"
-                cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-                cv2.putText(frame, label, (startX, startY - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                detections = net.forward()
+                
+                for i in range(detections.shape[2]):
+                    confidence = detections[0, 0, i, 2]
+                    if confidence > 0.5:
+                        idx = int(detections[0, 0, i, 1])
+                        box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+                        (startX, startY, endX, endY) = box.astype("int")
 
-        ret, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
+                        with lock:
+                            detected_objects.append({
+                                "class": labels[idx],
+                                "confidence": float(confidence)
+                            })
 
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                        label = f"{labels[idx]}: {confidence:.2f}"
+                        cv2.rectangle(image, (startX, startY), (endX, endY), (0, 255, 0), 2)
+                        cv2.putText(image, label, (startX, startY - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+                ret, buffer = cv2.imencode('.jpg', image)
+                frame = buffer.tobytes()
+
+                stream.truncate(0)  # Clear the stream for the next frame
+
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 # Function to detect emotion using keywords
 def detect_emotion(transcription):
@@ -180,4 +181,4 @@ def get_transcriptions():
 if __name__ == '__main__':
     audio_thread = threading.Thread(target=recognize_audio)
     audio_thread.start()
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
