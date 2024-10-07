@@ -1,0 +1,56 @@
+body {
+    margin: 0;
+    height: 100vh;
+    font-family: 'Arial', sans-serif;
+    background-color: #121212; /* Dark background for VR */
+    color: #ffffff; /* Light text color */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+h1 {
+    margin: 20px 0; /* Space above and below the title */
+}
+
+.container {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 2 columns */
+    grid-template-rows: repeat(2, 1fr); /* 2 rows */
+    height: 80vh; /* Height of the grid container */
+    width: 90vw; /* Width of the grid container */
+    gap: 10px; /* Gap between quadrants */
+}
+
+.quadrant {
+    background-color: rgba(33, 33, 33, 0.8); /* Semi-transparent background */
+    border-radius: 8px; /* Rounded corners */
+    padding: 10px; /* Padding inside each quadrant */
+    display: flex;
+    flex-direction: column; /* Stack content vertically */
+    justify-content: center; /* Center content vertically */
+    align-items: center; /* Center content horizontally */
+    transition: background-color 0.3s; /* Smooth hover effect */
+}
+
+.quadrant:hover {
+    background-color: rgba(66, 66, 66, 0.8); /* Darker on hover */
+}
+
+h2 {
+    margin: 10px 0; /* Space around the heading */
+    font-size: 1.2em; /* Heading size */
+    text-align: center; /* Centered heading */
+}
+
+img {
+    max-width: 100%; /* Ensure the image fits */
+    height: auto; /* Maintain aspect ratio */
+    border-radius: 4px; /* Slightly rounded image */
+}
+
+#output, #audioInput, #analysisOutput {
+    font-size: 1em; /* Normal text size for outputs */
+    text-align: center; /* Centered text */
+    margin-top: 10px; /* Spacing above the output areas */
+}

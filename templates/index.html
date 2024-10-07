@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>Live Object Detection</title>
+    <script>
+        async function fetchDetectedObjects() {
+            try {
+                const response = await fetch('/detected_objects');
+                const data = await response.json();
+                const outputDiv = document.getElementById('output');
+                outputDiv.innerHTML = ''; // Clear previous output
+
+                if (data.detected_objects.length === 0) {
+                    outputDiv.innerHTML = '<p>No objects detected.</p>';
+                } else {
+                    data.detected_objects.forEach(obj => {
+                        const item = document.createElement('p');
+                        item.textContent = `Detected: ${obj.class}, Confidence: ${(obj.confidence * 100).toFixed(2)}%`;
+                        outputDiv.appendChild(item);
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching detected objects:', error);
+            }
+        }
+
+        async function fetchTranscriptions() {
+            try {
+                const response = await fetch('/transcriptions');
+                const data = await response.json();
+                const transcriptionDiv = document.getElementById('transcriptionOutput');
+                transcriptionDiv.innerHTML = ''; // Clear previous output
+
+                data.transcriptions.forEach(transcription => {
+                    const item = document.createElement('p');
+                    item.textContent = `Transcription: ${transcription}`;
+                    transcriptionDiv.appendChild(item);
+                });
+
+                // Display analysis results
+                const analysisOutput = document.getElementById('analysisOutput');
+                analysisOutput.innerHTML = ''; // Clear previous analysis output
+
+                // Check the last analysis result for background color
+                if (data.analysis_results.length > 0) {
+                    const lastResult = data.analysis_results[data.analysis_results.length - 1];
+                    const analysisItem = document.createElement('p');
+                    analysisItem.textContent = `Danger Level: ${lastResult.danger_level}%, Emotion: ${lastResult.emotion}`;
+                    analysisOutput.appendChild(analysisItem);
+
+                    // Change the background color based on danger level
+                    const analysisQuadrant = document.getElementById('analysisQuadrant');
+                    if (lastResult.danger_level === "High") {
+                        analysisQuadrant.style.backgroundColor = "red"; // High danger
+                    } else {
+                        analysisQuadrant.style.backgroundColor = "green"; // Low danger
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching transcriptions:', error);
+            }
+        }
+
+        // Fetch detected objects and transcriptions every 5 seconds
+        setInterval(() => {
+            fetchDetectedObjects();
+            fetchTranscriptions();
+        }, 5000);
+    </script>
+</head>
+<body>
+    <h1>Live Object Detection</h1>
+    <div class="container">
+        <div class="quadrant" id="cameraQuadrant">
+            <h2>Camera Feed</h2>
+            <img src="{{ url_for('video_feed') }}" alt="Live Camera Feed">
+        </div>
+        <div class="quadrant" id="outputQuadrant">
+            <h2>Detected Objects</h2>
+            <div id="output"></div>
+        </div>
+        <div class="quadrant" id="audioQuadrant">
+            <h2>Audio Input</h2>
+            <div id="transcriptionOutput"></div>
+        </div>
+        <div class="quadrant" id="analysisQuadrant">
+            <h2>Threat Analysis</h2>
+            <div id="analysisOutput"></div>
+        </div>
+    </div>
+</body>
+</html>
